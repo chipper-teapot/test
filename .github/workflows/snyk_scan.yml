@@ -7,7 +7,11 @@ on:
   pull_request:
     branches:
       - main
-
+permissions:
+  security-events: write  # Allows the action to upload SARIF results to GitHub Security
+  actions: read           # (Optional) Needed for CodeQL to download action binaries
+  contents: read          # (Optional) Needed for checking out the code
+  
 jobs:
   security:
     runs-on: ubuntu-latest
