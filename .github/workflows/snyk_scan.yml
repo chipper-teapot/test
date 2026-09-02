@@ -1,25 +1,50 @@
-name: Example workflow for Python using Snyk
-on: push
+name: Snyk Multi-Language SAST Scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
 jobs:
   security:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@master
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          command: code test
-          args: --severity-threshold=high --sarif-file-output=snyk.sarif
-      - name: Print the snyk sarif file
-        run : cat snyk.sarif
-      - name : Total security issues
-        run : |
-          length=$(cat snyk.sarif | jq '.runs[0].results | length')
-          echo "RESULTS_LENGTH=$length" >> $GITHUB_ENV
-      - name: Pass_or_Fail_the_job
+          node-version: 20
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk Code Scan
+        continue-on-error: true
+        run: |
+          snyk code test \
+            --sarif-file-output=snyk.sarif
+
+      - name: Upload SARIF Results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif
+
+      - name: Count total number of vulnerabilities
+        run: |
+          RESULTS_LENGTH=$(jq '.runs[0].results | length' snyk.sarif)
+          echo "RESULTS_LENGTH=$RESULTS_LENGTH" >> $GITHUB_ENV
+          echo $RESULTS_LENGTH
+
+      - name: Pass or Fail the job
         run: |
           if [ "$RESULTS_LENGTH" != 0 ]; then
             echo "Job Failed"
@@ -27,13 +52,22 @@ jobs:
           else
             echo "Pass"
           fi
+
       - name: Send notification on Slack using Webhooks
         uses: slackapi/slack-github-action@v1.24.0
         if: always()
         with:
-         payload: |
-               {
-                 "text": "*The Snyk scan result for repo is : ${{ job.status }}* \n*Number of vulnerabilities : ${{ env.RESULTS_LENGTH }}* \n*Detail*: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-               }
+          payload: |
+            {
+              "text": "The Snyk scan result for repo is : ${{ job.status }}\nNumber of vulnerabilities : ${{ env.RESULTS_LENGTH }}\n*Detail*: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.slack_webhook_url }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
