@@ -12,4 +12,6 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: code test
-#bnm
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif
+      - name: Print the snyk sarif file
+        run : cat snyk.sarif
