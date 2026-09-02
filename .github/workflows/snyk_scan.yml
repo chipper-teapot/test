@@ -17,8 +17,8 @@ jobs:
         run : cat snyk.sarif
       - name : Total security issues
         run : |
-              length=$(cat snyk.sarif | jq '.runs[0].results | length')
-              echo "RESULTS_LENGTH=$length" >> $GITHUB_ENV
+          length=$(cat snyk.sarif | jq '.runs[0].results | length')
+          echo "RESULTS_LENGTH=$length" >> $GITHUB_ENV
       - name: Pass_or_Fail_the_job
         run: |
           if [ "$RESULTS_LENGTH" != 0 ]; then
@@ -27,3 +27,13 @@ jobs:
           else
             echo "Pass"
           fi
+      - name: Send notification on Slack using Webhooks
+        uses: slackapi/slack-github-action@v1.24.0
+        if: always()
+        with:
+          payload: |
+            {
+              "text": "The Snyk scan result for repo , snykgithubdemoyt, is : ${{ job.status }} \n*"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.slack_webhook_url }}
