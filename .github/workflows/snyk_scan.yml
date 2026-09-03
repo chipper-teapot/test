@@ -1,0 +1,75 @@
+name: Snyk Multi-Language SAST Scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+permissions:
+  security-events: write  # Allows the action to upload SARIF results to GitHub Security
+  actions: read           # (Optional) Needed for CodeQL to download action binaries
+  contents: read          # (Optional) Needed for ch ecking out the code
+  
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk Code Scan
+        continue-on-error: true
+        run: |
+          snyk code test \
+            --sarif-file-output=snyk.sarif
+
+      - name: Upload SARIF Results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk.sarif
+
+      - name: Count total number of vulnerabilities
+        run: |
+          RESULTS_LENGTH=$(jq '.runs[0].results | length' snyk.sarif)
+          echo "RESULTS_LENGTH=$RESULTS_LENGTH" >> $GITHUB_ENV
+          echo $RESULTS_LENGTH
+
+#        run: |
+ #           echo "Job Failed"
+ #           exit 1
+  #        else
+   #         echo "Pass"
+    #      fi
+
+      - name: Send notification on Slack using Webhooks
+        uses: slackapi/slack-github-action@v1.24.0
+        if: always()
+        with:
+          payload: |
+            {
+              "text": "The Snyk scan result for repo is : ${{ job.status }}\nNumber of vulnerabilities : ${{ env.RESULTS_LENGTH }}\n*Detail*: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
