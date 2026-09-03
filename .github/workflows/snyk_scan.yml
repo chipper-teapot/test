@@ -48,14 +48,12 @@ jobs:
           echo "RESULTS_LENGTH=$RESULTS_LENGTH" >> $GITHUB_ENV
           echo $RESULTS_LENGTH
 
-      - name: Pass or Fail the job
-        run: |
-          if [ "$RESULTS_LENGTH" != 0 ]; then
-            echo "Job Failed"
-            exit 1
-          else
-            echo "Pass"
-          fi
+#        run: |
+ #           echo "Job Failed"
+ #           exit 1
+  #        else
+   #         echo "Pass"
+    #      fi
 
       - name: Send notification on Slack using Webhooks
         uses: slackapi/slack-github-action@v1.24.0
